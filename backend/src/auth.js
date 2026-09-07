@@ -1,145 +1,103 @@
-const express = require("express");
-const crypto = require("crypto");
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const User = require('./User');
 
-const USER_ROLES = {
-  FARMER: "farmer",
-  ADMIN: "admin",
+const JWT_SECRET = process.env.JWT_SECRET || 'smart_farmer_super_secret_jwt_key_2026';
+
+// Register User
+exports.signup = async (req, res) => {
+  try {
+    const { name, email, phone, password, role, village, district } = req.body;
+
+    if (!name || !email || !password || !phone) {
+      return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
+    if (existingUser) {
+      return res.status(400).json({ error: 'Email is already registered' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const newUser = new User({
+      name,
+      email: email.toLowerCase(),
+      phone,
+      password: hashedPassword,
+      role: role || 'farmer',
+      village: village || '',
+      district: district || '',
+    });
+
+    await newUser.save();
+
+    const token = jwt.sign(
+      { id: newUser._id, email: newUser.email, role: newUser.role },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.status(201).json({
+      message: 'User registered successfully in MongoDB',
+      token,
+      user: {
+        id: newUser._id,
+        name: newUser.name,
+        email: newUser.email,
+        phone: newUser.phone,
+        role: newUser.role,
+        village: newUser.village,
+        district: newUser.district,
+      },
+    });
+  } catch (error) {
+    console.error('Signup error:', error);
+    res.status(500).json({ error: 'Server error during signup' });
+  }
 };
 
-const users = new Map();
+// Login User
+exports.signin = async (req, res) => {
+  try {
+    const { email, password } = req.body;
 
-function normalizeEmail(email) {
-  return String(email || "").trim().toLowerCase();
-}
-
-function validatePassword(password) {
-  if (!password || typeof password !== "string") {
-    return "Password is required.";
-  }
-
-  if (password.length < 8) {
-    return "Password must be at least 8 characters long.";
-  }
-
-  if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password)) {
-    return "Password must include uppercase, lowercase, and a number.";
-  }
-
-  return "";
-}
-
-function hashPassword(password) {
-  return crypto.createHash("sha256").update(password).digest("hex");
-}
-
-function createAuthRouter() {
-  const router = express.Router();
-
-  router.post("/signup", (req, res) => {
-    const { name, email, password, role } = req.body || {};
-
-    if (!name || !String(name).trim()) {
-      return res.status(400).json({ message: "Name is required." });
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const normalizedEmail = normalizeEmail(email);
-    if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-      return res.status(400).json({ message: "Valid email is required." });
-    }
-
-    const passwordError = validatePassword(password);
-    if (passwordError) {
-      return res.status(400).json({ message: passwordError });
-    }
-
-    const selectedRole = role === USER_ROLES.ADMIN ? USER_ROLES.ADMIN : USER_ROLES.FARMER;
-    if (users.has(normalizedEmail)) {
-      return res.status(409).json({ message: "An account with this email already exists." });
-    }
-
-    const user = {
-      id: crypto.randomUUID(),
-      name: String(name).trim(),
-      email: normalizedEmail,
-      passwordHash: hashPassword(password),
-      role: selectedRole,
-    };
-
-    users.set(normalizedEmail, user);
-
-    return res.status(201).json({
-      message: "Account created successfully.",
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
-    });
-  });
-
-  router.post("/signin", (req, res) => {
-    const { email, password } = req.body || {};
-    const normalizedEmail = normalizeEmail(email);
-
-    if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-      return res.status(400).json({ message: "Valid email is required." });
-    }
-
-    const passwordError = validatePassword(password);
-    if (passwordError) {
-      return res.status(400).json({ message: passwordError });
-    }
-
-    const user = users.get(normalizedEmail);
+    const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
-      return res.status(401).json({ message: "Invalid email or password." });
+      return res.status(400).json({ error: 'Invalid email or password' });
     }
 
-    if (user.passwordHash !== hashPassword(password)) {
-      return res.status(401).json({ message: "Invalid email or password." });
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ error: 'Invalid email or password' });
     }
 
-    return res.json({
-      message: "Sign in successful.",
+    const token = jwt.sign(
+      { id: user._id, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.status(200).json({
+      message: 'Login successful',
+      token,
       user: {
-        id: user.id,
+        id: user._id,
         name: user.name,
         email: user.email,
+        phone: user.phone,
         role: user.role,
+        village: user.village,
+        district: user.district,
       },
     });
-  });
-
-  router.get("/me", (req, res) => {
-    const email = normalizeEmail(req.query.email);
-    if (!email) {
-      return res.status(400).json({ message: "Email is required." });
-    }
-
-    const user = users.get(email);
-    if (!user) {
-      return res.status(404).json({ message: "User not found." });
-    }
-
-    return res.json({
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
-    });
-  });
-
-  return router;
-}
-
-module.exports = {
-  USER_ROLES,
-  validatePassword,
-  normalizeEmail,
-  hashPassword,
-  createAuthRouter,
-  users,
+  } catch (error) {
+    console.error('Signin error:', error);
+    res.status(500).json({ error: 'Server error during signin' });
+  }
 };
