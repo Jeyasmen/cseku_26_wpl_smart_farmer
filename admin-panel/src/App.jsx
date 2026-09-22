@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
+import ExpertPanel from './ExpertPanel' // 🚀 Expert Panel ইমপোর্ট করা হলো
 import './App.css'
 
 const emptyForm = {
@@ -449,7 +450,7 @@ function App() {
             </section>
           )}
 
-          {/* 4. FARMS SECTION (WITH DESCRIPTION & AI CONTEXT) */}
+          {/* 4. FARMS SECTION */}
           {activeSection === 'farms' && (
             <section className="content-section">
               <div className="table-container">
@@ -618,27 +619,10 @@ function App() {
             </section>
           )}
 
-          {/* 7. REPORTS SECTION */}
+          {/* 7. REPORTS SECTION (🚀 EXPERT PANEL INTEGRATED HERE) */}
           {activeSection === 'reports' && (
-            <section className="content-section">
-              <div className="table-container">
-                <table className="content-table">
-                  <thead>
-                    <tr>
-                      <th>Problem</th>
-                      <th>Crop</th>
-                      <th>Farmer</th>
-                      <th>Reported Date</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td colSpan="5" style={{ textAlign: 'center', padding: '20px', color: '#999' }}>No pest or disease reports submitted yet.</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+            <section className="content-section" style={{ background: 'transparent', boxShadow: 'none', padding: 0 }}>
+              <ExpertPanel />
             </section>
           )}
 

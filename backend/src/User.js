@@ -13,6 +13,8 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     trim: true,
   },
+  bio: { type: String, default: '' },
+  profilePicture: { type: String, default: '' },
   phone: {
     type: String,
     required: true,

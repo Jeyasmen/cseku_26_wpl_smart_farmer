@@ -20,10 +20,14 @@ const taskSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    description: {
+      type: String, // 🚀 এআই-এর বিস্তারিত (Step-by-step) গাইড এখানে সেভ হবে
+      default: '',
+    },
     activityType: {
       type: String,
-      enum: ['Watering', 'Fertilizing', 'Pesticide', 'Weeding', 'Harvesting', 'Other'],
-      default: 'Other',
+      required: true,
+      default: 'Other'
     },
     scheduledDate: {
       type: Date,
