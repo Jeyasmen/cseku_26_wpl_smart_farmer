@@ -403,7 +403,7 @@ class _RegisterCropScreenState extends State<RegisterCropScreen> {
 }
 
 // ==========================================
-// FARM DETAILS SCREEN (DATABASE CONNECTED CROPS)
+// FARM DETAILS SCREEN (DATABASE CONNECTED CROPS + EDIT/DELETE) 🚀
 // ==========================================
 class FarmDetailsScreen extends StatefulWidget {
   final String farmId;
@@ -422,18 +422,22 @@ class FarmDetailsScreen extends StatefulWidget {
 class _FarmDetailsScreenState extends State<FarmDetailsScreen> {
   List<dynamic> _farmCrops = [];
   bool _isLoading = true;
+  String _displayFarmName = '';
+  Map<String, dynamic>? _farmDetails;
 
   @override
   void initState() {
     super.initState();
-    _fetchCropsForThisFarm();
+    _displayFarmName = widget.farmName;
+    _fetchFarmDataAndCrops();
   }
 
-  Future<void> _fetchCropsForThisFarm() async {
+  Future<void> _fetchFarmDataAndCrops() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final token = authProvider.token;
 
     try {
+      // ১. ফার্মের আন্ডারের সব ফসল আনা
       final response = await http.get(
         Uri.parse('http://localhost:5000/api/crops/my'),
         headers: {
@@ -442,9 +446,19 @@ class _FarmDetailsScreenState extends State<FarmDetailsScreen> {
         },
       );
 
-      if (response.statusCode == 200) {
+      // ২. ইউজারের সব ফার্ম আনা (যাতে এই নির্দিষ্ট ফার্মের ডেটা ফিল্টার করা যায়)
+      final farmRes = await http.get(
+        Uri.parse('http://localhost:5000/api/farms/my-farms'),
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode == 200 && farmRes.statusCode == 200) {
         final allCrops = jsonDecode(response.body) as List;
-        // শুধুমাত্র এই ফার্মের আন্ডারের ক্রপগুলো ফিল্টার করা
+        final allFarms = jsonDecode(farmRes.body) as List;
+
         final filteredCrops = allCrops.where((crop) {
           final farmObj = crop['farmId'];
           if (farmObj is Map) {
@@ -453,16 +467,145 @@ class _FarmDetailsScreenState extends State<FarmDetailsScreen> {
           return farmObj == widget.farmId;
         }).toList();
 
-        setState(() {
-          _farmCrops = filteredCrops;
-          _isLoading = false;
-        });
+        final currentFarm = allFarms.firstWhere(
+          (f) => f['_id'] == widget.farmId,
+          orElse: () => null,
+        );
+
+        if (mounted) {
+          setState(() {
+            _farmCrops = filteredCrops;
+            if (currentFarm != null) {
+              _farmDetails = currentFarm;
+              _displayFarmName = currentFarm['name'] ?? widget.farmName;
+            }
+            _isLoading = false;
+          });
+        }
       } else {
-        setState(() => _isLoading = false);
+        if (mounted) setState(() => _isLoading = false);
       }
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  // 🚀 ফার্ম মুছুন (Delete)
+  Future<void> _deleteFarm() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('ফার্ম মুছুন', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+        content: const Text('আপনি কি নিশ্চিত যে এই ফার্মটি মুছে ফেলতে চান? এর সাথে যুক্ত সব ফসল এবং কাজ চিরতরে মুছে যাবে।'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('না, বাতিল', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('হ্যাঁ, মুছুন', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _isLoading = true);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    try {
+      final res = await http.delete(
+        Uri.parse('http://localhost:5000/api/farms/${widget.farmId}'),
+        headers: {'Authorization': 'Bearer ${authProvider.token}'},
+      );
+
+      if (res.statusCode == 200) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ফার্মটি সফলভাবে মুছে ফেলা হয়েছে!'), backgroundColor: Colors.red));
+          Navigator.pop(context); // আগের পেজে ফিরে যাবে
+        }
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // ✏️ ফার্ম সম্পাদনা (Edit)
+  void _showEditFarmModal() {
+    final nameController = TextEditingController(text: _farmDetails?['name'] ?? '');
+    final locationController = TextEditingController(text: _farmDetails?['location'] ?? '');
+    bool isSaving = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (modalContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(modalContext).viewInsets.bottom, left: 20, right: 20, top: 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('ফার্ম সম্পাদনা করুন (Edit Farm)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF18392d))),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: nameController,
+                    decoration: InputDecoration(labelText: 'Farm Name (e.g. North Field)', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: locationController,
+                    decoration: InputDecoration(labelText: 'Location/District', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2f8d5c), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 14)),
+                      onPressed: isSaving ? null : () async {
+                        if (nameController.text.trim().isEmpty) return;
+                        setModalState(() => isSaving = true);
+                        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+                        try {
+                          final res = await http.put(
+                            Uri.parse('http://localhost:5000/api/farms/${widget.farmId}'),
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'Authorization': 'Bearer ${authProvider.token}'
+                            },
+                            body: jsonEncode({
+                              'name': nameController.text.trim(),
+                              'location': locationController.text.trim(),
+                              'landSize': _farmDetails?['landSize'], // আগের সাইজটাই থাকবে
+                              'soilType': _farmDetails?['soilType'], // আগের মাটিটাই থাকবে
+                            }),
+                          );
+                          if (res.statusCode == 200) {
+                            if (mounted) Navigator.pop(modalContext);
+                            _fetchFarmDataAndCrops(); // রিফ্রেশ
+                          }
+                        } catch (e) {
+                          setModalState(() => isSaving = false);
+                        }
+                      },
+                      child: isSaving ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text('Update Farm', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -471,11 +614,15 @@ class _FarmDetailsScreenState extends State<FarmDetailsScreen> {
       backgroundColor: const Color(0xFFF3faf4),
       appBar: AppBar(
         title: Text(
-          widget.farmName,
+          _displayFarmName,
           style: const TextStyle(color: Colors.white),
         ),
         backgroundColor: const Color(0xFF12362b),
         iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          IconButton(icon: const Icon(Icons.edit, color: Colors.white70), tooltip: 'Edit Farm', onPressed: _showEditFarmModal),
+          IconButton(icon: const Icon(Icons.delete_forever, color: Colors.redAccent), tooltip: 'Delete Farm', onPressed: _deleteFarm),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -504,12 +651,12 @@ class _FarmDetailsScreenState extends State<FarmDetailsScreen> {
                       MaterialPageRoute(
                         builder: (_) => RegisterCropScreen(
                           preSelectedFarmId: widget.farmId,
-                          preSelectedFarmName: widget.farmName,
+                          preSelectedFarmName: _displayFarmName,
                         ),
                       ),
                     );
                     if (result == true) {
-                      _fetchCropsForThisFarm(); // নতুন ক্রপ যোগ করে আসলে লিস্ট রিফ্রেশ হবে
+                      _fetchFarmDataAndCrops(); // নতুন ক্রপ যোগ করে আসলে লিস্ট রিফ্রেশ হবে
                     }
                   },
                   icon: const Icon(Icons.add, size: 16),
@@ -579,7 +726,7 @@ class _FarmDetailsScreenState extends State<FarmDetailsScreen> {
                                     itemName: cropType,
                                   ),
                                 ),
-                              );
+                              ).then((_) => _fetchFarmDataAndCrops()); // ব্যাক করে এলে রিফ্রেশ
                             },
                           ),
                         );
