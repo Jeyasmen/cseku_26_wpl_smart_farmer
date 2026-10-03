@@ -12,6 +12,11 @@ const cropSchema = new mongoose.Schema(
       ref: 'Farm',
       required: true,
     },
+    cropCategory: {
+      type: String,
+      default: 'শাকসবজি (Vegetables)',
+      trim: true,
+    },
     cropType: {
       type: String,
       required: true,
@@ -22,9 +27,36 @@ const cropSchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
+    // আবাদকৃত জমির পরিমাণ ও একক
+    allocatedArea: {
+      type: Number,
+      default: 0,
+    },
+    areaUnit: {
+      type: String,
+      default: 'শতাংশ (Decimal)',
+    },
+    // বীজ বা চারার পরিমাণ, একক ও উৎস
+    seedQuantity: {
+      type: Number,
+      default: 0,
+    },
+    seedUnit: {
+      type: String,
+      default: 'গ্রাম (gm)',
+    },
+    seedSource: {
+      type: String,
+      default: 'স্থানীয় অনুমোদিত ডিলার',
+    },
+    // উপযুক্ত নতুন ফসল হলে অন্য কৃষকদের লিস্টে দেখানোর ফ্ল্যাগ
+    isCatalogApproved: {
+      type: Boolean,
+      default: false,
+    },
     cultivationMethod: {
       type: String,
-      default: 'Open Field',
+      default: 'Open Field (মাঠ)',
     },
     description: {
       type: String,
@@ -47,7 +79,6 @@ const cropSchema = new mongoose.Schema(
       enum: ['In Progress', 'Harvested', 'Failed'],
       default: 'In Progress',
     },
-    // নতুন যুক্ত করা ফিল্ডগুলো
     totalExpense: {
       type: Number,
       default: 0,
@@ -55,10 +86,18 @@ const cropSchema = new mongoose.Schema(
     expenses: [
       {
         title: String,
+        category: {
+          type: String,
+          default: 'Other',
+        },
         amount: Number,
         date: { type: Date, default: Date.now },
       }
     ],
+    aiExpenseAnalysis: {
+      type: String,
+      default: '',
+    },
     diaryNotes: [
       {
         note: String,

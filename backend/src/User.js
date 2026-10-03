@@ -26,7 +26,7 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['farmer', 'buyer', 'admin'],
+    enum: ['farmer', 'buyer', 'expert', 'admin'],
     default: 'farmer',
   },
   village: {
@@ -38,6 +38,48 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true,
     default: '',
+  },
+  isTopFarmer: {
+    type: Boolean,
+    default: false,
+  },
+  badgeTitle: {
+    type: String,
+    default: 'Active Farmer',
+  },
+  // 👨‍🌾 নিয়োগপ্রাপ্ত কৃষি বিশেষজ্ঞের (Expert Job Profile) অতিরিক্ত তথ্য
+  designation: {
+    type: String,
+    default: 'উপজেলা কৃষি কর্মকর্তা',
+    trim: true,
+  },
+  specialization: {
+    type: String,
+    default: 'ফসল রোগতত্ত্ব ও সার ব্যবস্থাপনা',
+    trim: true,
+  },
+  hotlineNumber: {
+    type: String,
+    default: '',
+    trim: true,
+  },
+  whatsappNumber: {
+    type: String,
+    default: '',
+    trim: true,
+  },
+  dutyHours: {
+    type: String,
+    default: 'সকাল ৯:০০ - বিকাল ৫:০০',
+    trim: true,
+  },
+  isAvailable: {
+    type: Boolean,
+    default: true,
+  },
+  resolvedIssuesCount: {
+    type: Number,
+    default: 0,
   },
   createdAt: {
     type: Date,

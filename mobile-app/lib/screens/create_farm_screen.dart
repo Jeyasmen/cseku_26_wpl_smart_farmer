@@ -14,20 +14,36 @@ class CreateFarmScreen extends StatefulWidget {
 class _CreateFarmScreenState extends State<CreateFarmScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // Controllers for text fields
   final TextEditingController _farmNameController = TextEditingController();
   final TextEditingController _farmSizeController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
   final TextEditingController _phController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
 
-  String? _selectedSoilType;
+  String _selectedUnit = 'শতাংশ (Decimal)';
+  String? _selectedSoilType = 'Loamy (দোআঁশ)';
+
+  final List<String> _landUnits = [
+    'শতাংশ (Decimal)',
+    'বিঘা (Bigha)',
+    'একর (Acre)',
+    'কাঠা (Katha)',
+  ];
+
   final List<String> _soilTypes = [
     'Loamy (দোআঁশ)',
+    'Sandy Loam (বেলে-দোআঁশ)',
+    'Clay Loam (এঁটেল-দোআঁশ)',
     'Clay (এঁটেল)',
     'Sandy (বেলে)',
-    'Silty (পলি)',
-    'Peaty (জৈব)'
+    'Silty (পলি মাটি)',
+  ];
+
+  final List<String> _quickFarmNames = [
+    'উত্তর মাঠের জমি',
+    'দক্ষিণ বিল ঘের',
+    'বাড়ির পাশের বাগান',
+    'পশ্চিম পাড়ার ক্ষেত',
   ];
 
   bool _isLoading = false;
@@ -42,16 +58,14 @@ class _CreateFarmScreenState extends State<CreateFarmScreen> {
     super.dispose();
   }
 
-  // 🚀 REAL BACKEND CALL TO SAVE FARM IN MONGODB
   Future<void> _saveFarm() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final token = authProvider.token; // ✅ সঠিক প্রপার্টি
+    final token = authProvider.token;
+
     try {
       final url = Uri.parse('http://localhost:5000/api/farms');
       final response = await http.post(
@@ -63,6 +77,7 @@ class _CreateFarmScreenState extends State<CreateFarmScreen> {
         body: jsonEncode({
           'name': _farmNameController.text.trim(),
           'landSize': _farmSizeController.text.trim(),
+          'unit': _selectedUnit,
           'location': _locationController.text.trim(),
           'soilType': _selectedSoilType ?? 'Loamy (দোআঁশ)',
           'ph': _phController.text.trim().isNotEmpty ? _phController.text.trim() : null,
@@ -76,11 +91,11 @@ class _CreateFarmScreenState extends State<CreateFarmScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Farm created successfully and saved in Database!'),
+            content: Text('✅ নতুন খামার সফলভাবে তৈরি হয়েছে!'),
             backgroundColor: Color(0xFF2f8d5c),
           ),
         );
-        Navigator.pop(context, true); // Go back to Dashboard
+        Navigator.pop(context, true);
       } else {
         throw Exception(data['error'] ?? 'Failed to create farm');
       }
@@ -94,9 +109,7 @@ class _CreateFarmScreenState extends State<CreateFarmScreen> {
       );
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
     }
   }
@@ -110,8 +123,8 @@ class _CreateFarmScreenState extends State<CreateFarmScreen> {
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
-          'Add New Farm',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          'নতুন খামার / জমি যুক্ত করুন',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17),
         ),
       ),
       body: SingleChildScrollView(
@@ -122,75 +135,94 @@ class _CreateFarmScreenState extends State<CreateFarmScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Farm Details',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF18392d)),
+                'খামারের সাধারণ তথ্য',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF18392d)),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: _quickFarmNames.map((name) {
+                  return ActionChip(
+                    backgroundColor: Colors.white,
+                    side: BorderSide(color: Colors.grey.shade300),
+                    label: Text(name, style: const TextStyle(fontSize: 12, color: Color(0xFF18392d))),
+                    onPressed: () => setState(() => _farmNameController.text = name),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 12),
 
-              // 1. Farm Name
               TextFormField(
                 controller: _farmNameController,
-                decoration: _buildInputDecoration('Farm Name', Icons.landscape, 'e.g., North Field'),
-                validator: (value) => value == null || value.isEmpty ? 'Please enter farm name' : null,
+                decoration: _buildInputDecoration('খামার বা জমির নাম *', Icons.landscape, 'যেমন: উত্তর মাঠের জমি'),
+                validator: (value) => value == null || value.isEmpty ? 'খামারের নাম লিখুন' : null,
               ),
               const SizedBox(height: 16),
 
-              // 2. Farm Size & Location (Row)
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _farmSizeController,
-                      keyboardType: TextInputType.number,
-                      decoration: _buildInputDecoration('Size (Acres)', Icons.straighten, 'e.g., 2.5'),
-                      validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _locationController,
-                      decoration: _buildInputDecoration('Location', Icons.location_on, 'e.g., Sonapur'),
-                      validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              const Text(
-                'Soil Information',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF18392d)),
-              ),
-              const SizedBox(height: 16),
-
-              // 3. Soil Type & Soil pH
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     flex: 5,
-                    child: DropdownButtonFormField<String>(
-                      initialValue: _selectedSoilType,
-                      decoration: _buildInputDecoration('Soil Type', Icons.grass, null),
-                      items: _soilTypes.map((type) {
-                        return DropdownMenuItem(value: type, child: Text(type, style: const TextStyle(fontSize: 13)));
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedSoilType = value;
-                        });
-                      },
-                      validator: (value) => value == null ? 'Select type' : null,
+                    child: TextFormField(
+                      controller: _farmSizeController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: _buildInputDecoration('জমির আয়তন *', Icons.straighten, 'যেমন: ৫০'),
+                      validator: (value) => value == null || value.isEmpty ? 'আয়তন দিন' : null,
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 5,
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedUnit,
+                      decoration: _buildInputDecoration('একক', Icons.aspect_ratio, null),
+                      items: _landUnits.map((u) => DropdownMenuItem(value: u, child: Text(u, style: const TextStyle(fontSize: 13)))).toList(),
+                      onChanged: (val) {
+                        if (val != null) setState(() => _selectedUnit = val);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              TextFormField(
+                controller: _locationController,
+                decoration: _buildInputDecoration('এলাকা / উপজেলা / জেলা *', Icons.location_on, 'যেমন: ডুমুরিয়া, খুলনা'),
+                validator: (value) => value == null || value.isEmpty ? 'জমির লোকেশন লিখুন' : null,
+              ),
+              const SizedBox(height: 24),
+
+              const Text(
+                'মাটির গুণাগুণ (Soil Information)',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF18392d)),
+              ),
+              const SizedBox(height: 14),
+
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 6,
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedSoilType,
+                      decoration: _buildInputDecoration('মাটির ধরন', Icons.grass, null),
+                      items: _soilTypes.map((type) {
+                        return DropdownMenuItem(value: type, child: Text(type, style: const TextStyle(fontSize: 12.5)));
+                      }).toList(),
+                      onChanged: (value) => setState(() => _selectedSoilType = value),
+                      validator: (value) => value == null ? 'মাটির ধরন বাছুন' : null,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
                     flex: 4,
                     child: TextFormField(
                       controller: _phController,
-                      keyboardType: TextInputType.number,
-                      decoration: _buildInputDecoration('Soil pH (Opt)', Icons.science, 'e.g., 6.5'),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: _buildInputDecoration('মাটির pH (ঐচ্ছিক)', Icons.science, 'যেমন: 6.5'),
                     ),
                   ),
                 ],
@@ -198,17 +230,16 @@ class _CreateFarmScreenState extends State<CreateFarmScreen> {
               const SizedBox(height: 24),
 
               const Text(
-                'Additional Information',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF18392d)),
+                'জমির বিশেষ বিবরণ (ঐচ্ছিক)',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF18392d)),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
-              // 4. Description Box
               TextFormField(
                 controller: _descriptionController,
-                maxLines: 4,
+                maxLines: 3,
                 decoration: InputDecoration(
-                  hintText: 'Any specific issues like waterlogging, previous crop diseases, etc. This helps our AI give better advice.',
+                  hintText: 'জমিতে জলাবদ্ধতা হয় কি না, সেচের সুবিধা কেমন ইত্যাদি লিখে রাখতে পারেন...',
                   hintStyle: const TextStyle(color: Colors.grey, fontSize: 13),
                   filled: true,
                   fillColor: Colors.white,
@@ -217,9 +248,8 @@ class _CreateFarmScreenState extends State<CreateFarmScreen> {
                   focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: const BorderSide(color: Color(0xFF2f8d5c), width: 2)),
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 28),
 
-              // 5. Submit Button
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -233,7 +263,7 @@ class _CreateFarmScreenState extends State<CreateFarmScreen> {
                   onPressed: _isLoading ? null : _saveFarm,
                   child: _isLoading
                       ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : const Text('Create Farm', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      : const Text('খামার সংরক্ষণ করুন', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ),
               const SizedBox(height: 20),
@@ -249,11 +279,11 @@ class _CreateFarmScreenState extends State<CreateFarmScreen> {
       labelText: label,
       hintText: hint,
       hintStyle: const TextStyle(color: Colors.grey, fontSize: 13),
-      labelStyle: const TextStyle(color: Color(0xFF4d6e60), fontSize: 14),
+      labelStyle: const TextStyle(color: Color(0xFF4d6e60), fontSize: 13.5),
       prefixIcon: Icon(icon, color: const Color(0xFF2f8d5c), size: 20),
       filled: true,
       fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
       enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
       focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF2f8d5c), width: 2)),

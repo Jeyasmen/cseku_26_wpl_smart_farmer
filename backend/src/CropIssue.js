@@ -17,18 +17,35 @@ const cropIssueSchema = new mongoose.Schema(
       required: true,
     },
     imageBase64: {
-      type: String, // ফ্লাটার থেকে পাঠানো ছবির ডেটা (যদি থাকে)
+      type: String,
       default: null,
     },
     aiAdvice: {
-      type: String, // এআই কী উত্তর দিল সেটা এখানে সেভ থাকবে
+      type: String,
+      default: '',
     },
     needsExpert: {
       type: Boolean,
-      default: false, // কৃষক "Ask Expert" এ ক্লিক করলে এটি true হবে
+      default: false,
+    },
+    // 👨‍🌾 কৃষক যে নির্দিষ্ট বিশেষজ্ঞকে বাছাই করে সমস্যা পাঠিয়েছেন
+    assignedExpert: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
     },
     expertReply: {
-      type: String, // অ্যাডমিন প্যানেল থেকে এক্সপার্ট উত্তর দিলে এখানে সেভ হবে
+      type: String,
+      default: '',
+    },
+    // 👨‍🌾 কোন কৃষি কর্মকর্তা সমাধান দিয়েছেন
+    resolvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+    },
+    resolvedAt: {
+      type: Date,
       default: null,
     },
     status: {
@@ -37,7 +54,7 @@ const cropIssueSchema = new mongoose.Schema(
       default: 'AI_Resolved',
     },
   },
-  { timestamps: true } // কখন রিপোর্ট করা হয়েছে তার সময় ধরে রাখবে
+  { timestamps: true }
 );
 
 module.exports = mongoose.model('CropIssue', cropIssueSchema);

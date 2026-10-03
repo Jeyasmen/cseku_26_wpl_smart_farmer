@@ -17,8 +17,8 @@ const farmSchema = new mongoose.Schema(
       required: true,
     },
     unit: {
-      type: String,
-      default: 'Acres',
+      type: String, 
+      default: 'শতাংশ (Decimal)',
     },
     location: {
       type: String,
